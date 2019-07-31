@@ -8,32 +8,33 @@
     <!-- update the version number as needed -->
     <script defer src="/__/firebase/6.3.3/firebase-app.js"></script>
     <!-- include only the Firebase features as you need -->
-    <script defer src="/__/firebase/6.3.3/firebase-auth.js"></script>
+    <!-- <script defer src="/__/firebase/6.3.3/firebase-auth.js"></script> -->
     <script defer src="/__/firebase/6.3.3/firebase-firestore.js"></script>
     <!-- initialize the SDK after all desired features are loaded -->
     <script defer src="/__/firebase/init.js"></script>
   </head>
   <body>
+    <h1>コメントする画面</h1>
+    <input id="text" type="text" placeholder="Type messages here" />
+    <button id="send">Send</button>
     <script>
       document.addEventListener("DOMContentLoaded", function() {
-        // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
-        // The Firebase SDK is initialized and available here!
+        const $text = document.querySelector("#text");
+        const $send = document.querySelector("#send");
 
-        firebase.auth().onAuthStateChanged(user => {});
-
-        firebase
-          .firestore()
-          .collection("chats")
-          .onSnapshot(snapshot => {
-            for (let item of snapshot.docs) {
-              const data = item.data();
-              const h1 = document.createElement("h1");
-              h1.textContent = data.text;
-              document.body.appendChild(h1);
-            }
-          });
-
-        // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+        $send.addEventListener("click", () => {
+          const text = $text.value;
+          if (text) {
+            $text.value = "";
+            firebase
+              .firestore()
+              .collection("chats")
+              .add({
+                text,
+                created: firebase.firestore.Timestamp.now()
+              });
+          }
+        });
       });
     </script>
   </body>
