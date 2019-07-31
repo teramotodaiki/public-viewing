@@ -12,20 +12,28 @@
     <script defer src="/__/firebase/6.3.3/firebase-firestore.js"></script>
     <!-- initialize the SDK after all desired features are loaded -->
     <script defer src="/__/firebase/init.js"></script>
+    <script defer src="https://apis.google.com/js/api.js"></script>
     <style>
       body {
         background-color: black;
         color: white;
       }
+      #sign_in {
+        position: absolute;
+        bottom: 0px;
+        right: 0px;
+      }
     </style>
   </head>
   <body>
+    <span id="sign_in">SIGN IN</span>
     <script>
       // config
       let speed = 2; // コメントの流れる速度 [px/frame]
       let concurrency = 1; // 同時に subscribe できるコメント数. もしもチャットが詰まってきたら増やす
+      let interval = 100; // YouTuve Live のコメントを取得する間隔 [msec]
 
-      document.addEventListener("DOMContentLoaded", function() {
+      document.addEventListener("DOMContentLoaded", async function() {
         const elements = [];
 
         firebase
@@ -37,19 +45,23 @@
             for (let item of snapshot.docChanges()) {
               if (item.type === "added") {
                 const data = item.doc.data();
-                const h1 = document.createElement("h1");
-                h1.textContent = data.text;
-                const rect = h1.getBoundingClientRect();
-                h1.style.position = "absolute";
-                h1.style.right = `${-rect.width}px`;
-                document.body.appendChild(h1);
-                elements.push(h1);
+                showMessage(data.text);
               }
             }
           });
 
-        doChatAnimation();
+        function showMessage(text) {
+          const h1 = document.createElement("h1");
+          h1.textContent = text;
+          const rect = h1.getBoundingClientRect();
+          h1.style.position = "absolute";
+          h1.style.right = `${-rect.width}px`;
+          document.body.appendChild(h1);
+          elements.push(h1);
+        }
 
+        // アニメーションを行う
+        doChatAnimation();
         function doChatAnimation() {
           // TODO: 文字が重なったら下にズラす
           for (const element of elements) {
@@ -61,6 +73,72 @@
             }
           }
           requestAnimationFrame(doChatAnimation);
+        }
+
+        // Enabling YouTube API
+        await new Promise(resolve => gapi.load("client", resolve));
+        await gapi.client.init({
+          apiKey: "AIzaSyDm3Q0z7u9rxPdPH4EHqDGgbtBjswMJ-0A",
+          discoveryDocs: [
+            "https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest"
+          ],
+          clientId:
+            "511812515447-1bk0k3kocsn241lqufpohc5s2n57njc1.apps.googleusercontent.com",
+          scope:
+            "email profile https://www.googleapis.com/auth/youtube.readonly"
+        });
+
+        if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
+          // すでにログインしている
+          subscribeYouTubeLiveBroadcast();
+        }
+
+        const $signIn = document.querySelector("#sign_in");
+        $signIn.addEventListener("click", () => {
+          gapi.auth2
+            .getAuthInstance()
+            .signIn()
+            .then(subscribeYouTubeLiveBroadcast);
+        });
+
+        async function subscribeYouTubeLiveBroadcast() {
+          const liveBroadcasts = await gapi.client.youtube.liveBroadcasts.list({
+            part: "snippet",
+            broadcastType: "all",
+            mine: true
+          });
+          if (liveBroadcasts.result.items.length < 1) {
+            alert(`放送中の YouTube Live が見つかりませんでした`);
+            return;
+          }
+          for (const liveBroadcast of liveBroadcasts.result.items) {
+            if (
+              confirm(`${liveBroadcast.snippet.title} のコメントを流しますか？`)
+            ) {
+              execPollingLiveChats(liveBroadcast.snippet.liveChatId); // ポーリングを開始する
+              break;
+            }
+          }
+        }
+
+        async function execPollingLiveChats(liveChatId, pageToken) {
+          const liveChatMessages = await gapi.client.youtube.liveChatMessages.list(
+            {
+              liveChatId,
+              part: "snippet",
+              pageToken
+            }
+          );
+          console.log(liveChatMessages);
+          for (const liveChatMessage of liveChatMessages.result.items) {
+            showMessage(liveChatMessage.snippet.displayMessage);
+          }
+          setTimeout(() => {
+            execPollingLiveChats(
+              liveChatId,
+              liveChatMessages.result.nextPageToken
+            );
+          }, liveChatMessages.result.pollingIntervalMillis);
         }
       });
     </script>
